@@ -9,7 +9,7 @@ int write_primes(long max, char *file){
     // to force alignment, make max the next multiple of 8;
     max += !!(0x7 & max) << 3;
     max &= ~(0x7);
-    long stop = (long)sqrt(max);
+    unsigned long stop = (unsigned long)sqrt(max);
     //printf("max: %d, stop: %d\n", max, stop);
     char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
     FILE *read = fopen(file, "r");
@@ -31,13 +31,13 @@ int write_primes(long max, char *file){
     if(!size)
         new_primes[0] |= 0xC0;
     unsigned long *old_primes = (long *)calloc(4096, sizeof(long));
-    int i; 
+    //int i; 
     unsigned long offset = 0; // offset in bits in read
     int current_prime_old = 0; // current prime whose multiples to cross out 
     int current_prime_new = 0;
     char current; // current byte in read
-    long mask = 0;
-    int chunk_size = 0;;
+    //long mask = 0;
+    int chunk_size = 0;
     while(1){ 
         //printf("outer\n");
         long p;
@@ -81,7 +81,7 @@ int write_primes(long max, char *file){
         }
         //printf("p: %d\n", p);
         //printf("size = %d\n", size);
-        for(int j = p * p; j < max; j += p){
+        for(unsigned long j = p * p; j < max; j += p){
             //printf("j - size: %d\n", j - size);
             //printf("(j - size) % 8: %d\n", (j - size) % 8);
             if((int)(j - size) < 0){
