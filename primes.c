@@ -27,6 +27,7 @@ int write_primes(long max, char *file){
         printf("File already contains more than %d primes\n", max);
         return -1;
     }
+    //printf("size: %d\n", size);
     unsigned char *new_primes = (char *)calloc((max - size) / 8, 
             sizeof(char));
     if(!size)
@@ -64,23 +65,24 @@ int write_primes(long max, char *file){
             p = old_primes[current_prime_old];
             current_prime_old = (current_prime_old + 1) % 4096;
         }else{
+            //printf("hi\n");
             //printf("current_prime_new = %d\n", current_prime_new);
-            //printf("size: %d\n", size);
-            while(new_primes[(p = current_prime_new + size) / 8] & 
-                    masks[p % 8]){ 
+            while(new_primes[current_prime_new / 8] & 
+                    masks[current_prime_new  % 8]){ 
                 //printf("new_primes[(p = current_prime_new + size) / 8] = %X\n", new_primes[(p = current_prime_new + size) / 8]);
                 //printf("p mod 8 = %d\n", p % 8);
                 //printf("p: %d\n", p);
                 current_prime_new++;
             }
-
+            p = current_prime_new + size;
+            current_prime_new++;
         }
         if(p > stop){
             //printf("break_a\n");
-            printf("p: %d\n", p);
+            //printf("p: %d\n", p);
             break;
         }
-        //printf("p: %d\n", p);
+        //printf("P is %d\n", p);
         //printf("size = %d\n", size);
         for(unsigned long j = p * p; j < max; j += p){
             //printf("j - size: %d\n", j - size);
@@ -91,7 +93,6 @@ int write_primes(long max, char *file){
             }
             new_primes[(j - size) / 8] |= masks[(j - size) % 8];
         }
-        current_prime_new++;
         //printf("herp p: %d\n", p);
     }
     /*
@@ -124,6 +125,8 @@ int main(int argc, char **argv){
     write_primes(in, argv[2]);
     printf("Write Finished.\n");
     char buffer[20];
+    printf("Enter file to scan: ");
+    fflush(stdin);
     scanf("%s", buffer);
     prime_init(buffer);
     unsigned long l;
