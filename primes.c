@@ -5,13 +5,14 @@
 //#define
 
 // returns total number of primes in file
+char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+FILE *prime_check;
 int write_primes(long max, char *file){
     // to force alignment, make max the next multiple of 8;
     max += !!(0x7 & max) << 3;
     max &= ~(0x7);
     unsigned long stop = (unsigned long)sqrt(max);
     //printf("max: %d, stop: %d\n", max, stop);
-    char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
     FILE *read = fopen(file, "r");
     FILE *write;
     unsigned long size;
@@ -76,7 +77,7 @@ int write_primes(long max, char *file){
         }
         if(p > stop){
             //printf("break_a\n");
-            //printf("p: %d\n", p);
+            printf("p: %d\n", p);
             break;
         }
         //printf("p: %d\n", p);
@@ -84,7 +85,7 @@ int write_primes(long max, char *file){
         for(unsigned long j = p * p; j < max; j += p){
             //printf("j - size: %d\n", j - size);
             //printf("(j - size) % 8: %d\n", (j - size) % 8);
-            if((int)(j - size) < 0){
+            if((long)(j - size) < 0){
                 //printf("continue\n");
                 continue;
             }
@@ -94,9 +95,9 @@ int write_primes(long max, char *file){
         //printf("herp p: %d\n", p);
     }
     /*
-    for(int i = 0; i < (max - size) / 8; i++)
-        printf("%hhd\n", new_primes[i]);
-    */
+       for(int i = 0; i < (max - size) / 8; i++)
+       printf("%hhd\n", new_primes[i]);
+       */
     fseek(write, 0, SEEK_SET);
     fwrite(&max, sizeof(long), 1, write);
     fseek(write, 0, SEEK_END);
@@ -106,9 +107,28 @@ int write_primes(long max, char *file){
     fclose(write);
 }   
 
+int prime_init(char *file){
+    prime_check = fopen(file, "r");
+    return !prime_check;
+}
 
+int is_prime(unsigned long l){
+    fseek(prime_check, 8 + l / 8, SEEK_SET);
+    char c;
+    fread(&c, sizeof(char), 1, prime_check);
+    return !(c & masks[l % 8]);
+}
 
 int main(int argc, char **argv){
     unsigned long in = strtoul(argv[1], NULL, 10); 
-    write_primes(in, "primes.txt");
+    write_primes(in, argv[2]);
+    printf("Write Finished.\n");
+    char buffer[20];
+    scanf("%s", buffer);
+    prime_init(buffer);
+    unsigned long l;
+    while(1){
+        scanf("%lu", &l);
+        printf("Is %lu prime: %d\n", l, is_prime(l));
+    }
 }
