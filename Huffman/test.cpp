@@ -1,12 +1,13 @@
 #include <stdio.h>
-#include <vector>
+#include <stdlib.h>
+#include "huff.h"
 
 using namespace std;
 
 int main(){
-    vector<int> v;
+    P_Queue q;
     for(int i = 0; i < 10; i++)
-        v.push_back(i);
-    v[0] = v[1];
-    printf("%d\n", v[0]);
+        q.push((Node *)malloc(sizeof(Node)));
+    q[0] = q[1];
+    printf("%d\n", q[0]);
 }

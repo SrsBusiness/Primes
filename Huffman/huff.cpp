@@ -6,11 +6,11 @@
 #include <string.h>
 using namespace std;
 
-#define NAC 128 // not a character
-#define EOFC 129 // eof character
+#define NAC 256 // not a character
+#define EOFC 257 // eof character
 unsigned char *data;
 size_t size;
-char freq[256];
+int freq[256];
 FILE *fp;
 Node *tree;
 P_Queue queue;
@@ -40,7 +40,7 @@ void load_file(char *file){
     data = (unsigned char *)calloc(size, sizeof(char));
     fread(data, sizeof(char), size, fp);
     for(int i = 0; i < size; i++){
-        freq[128 + data[i]]++;
+        freq[data[i]]++;
     }
     for(int i = 0; i < size; i++){
         printf("%X ", data[i]);
@@ -57,8 +57,9 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
     // at the beginning of this function call, the buffer should never be full
     // since it should have been flushed at the end of the last call to this function
     // need to shift buffer by the offset
-    printf("bits: %d\n", bits);
+    //printf("bits: %d\n", bits);
     int size = (bits + 15) / 8;
+    //printf("size: %d\n", size);
     unsigned char *shift = (unsigned char *)calloc(size, sizeof(char));  
     for(int i = size - 2; i >= 0; i--){
         shift[i + 1] |= (buffer[i] & (1 << (b_stream -> offset - 1))) << (8 - b_stream -> offset);
@@ -73,7 +74,8 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
                 b_stream -> buffer[j] = 0;
             }
         }
-        b_stream -> buffer[size++] |= shift[i];
+        //printf("size + 1: %d, i: %d\n", size + 1, i);  
+        b_stream -> buffer[b_stream -> size++] |= shift[i];
     }
     b_stream -> offset = (b_stream -> offset + bits) % 8;
 }
@@ -152,25 +154,47 @@ void store_codes(Node * n, code c){
         c.length--;
     }
     if(!n -> left && !n -> right){
-        printf("byte: %X\n", n -> c);
+        printf("added\n");
+        //printf("byte: %X\n", n -> c);
         int length = (c.length + 7) / sizeof(char);
         unsigned char *tmp = (unsigned char *)calloc(length, sizeof(char)); 
         memcpy(tmp, c.code_seq, length);
         //codes.insert(pair<int, code>(n -> c, (code){tmp, c.length, length}));
         codes[n -> c] = (code){tmp, c.length, length};
+        if(n -> c == EOFC)
+            printf("EOF character added. Length: %d\n", c.length);
         printf("length: %d\n", c.length);
     }
 }
 
+void print_codes(){
+    printf("Codes:\n");
+    for(int i = 0; i < 257; i++){
+        code c = codes[i];
+        if(!c.length)
+            continue;
+        printf("%X: ", i);
+        for(int j = 0; j < c.length; j++){
+            putchar('0' + ((c.code_seq[j / 8] >> (7 - j)) & 1));
+        }
+        putchar('\n');
+    }
+}
+
 void compress(char *compressed){
-    queue.size();
+    printf("size: %d\n", queue.size());
     for(int i = 0; i < 256; i++){
         if(!freq[i])
             continue;
+        printf("i = %X, freq = %d\n", i, freq[i]);
         Node *n = (Node *)malloc(sizeof(Node));
         *n = (Node){i, freq[i], 0, NULL, NULL};
         queue.push(n);
     }
+    // push eof
+    Node *eof = (Node *)malloc(sizeof(Node));
+    *eof = (Node){EOFC, 0, 0, NULL, NULL};
+    queue.push(eof);
     while(queue.size() > 1){
         Node *n1 = queue.pop();
         Node *n2 = queue.pop();
@@ -182,11 +206,16 @@ void compress(char *compressed){
     //unsigned char *eof_code = (unsigned char *)calloc(4, sizeof(char));
     //find_eof(tree, eof_code, 0, 4);
     unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
+    for(int i = 0; i < 257; i++)
+        codes[i] = (code){0, 0, 0};
     store_codes(tree, (code){code_seq, 0, 4});
+    print_codes();
     bit_stream *b = b_open(compressed);
     for(int i = 0; i < size; i++){
-        code c = codes[data[i] + 128];
-        printf("hi\n");
+        code c = codes[data[i]];
+        if(!c.length)
+            continue;
+        //printf("length: %d, character: %X\n", c.length, data[i]);
         b_write(b, c.code_seq, c.length);
     }
     b_write(b, codes[257].code_seq, codes[257].length);

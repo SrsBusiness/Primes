@@ -28,7 +28,7 @@ class P_Queue{
             count = 0;
             //v = vector<Node *>();
         }
-        void push(Node* n){
+        void push(Node *n){
             n -> n = count++;
             v.push_back(n);
             size_t index = v.size() - 1;
