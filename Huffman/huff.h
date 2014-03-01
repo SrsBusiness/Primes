@@ -115,9 +115,8 @@ Node *P_Queue::pop(){
 }
 
 struct bit_stream{
-    char offset;
-    size_t size;
-    size_t capacity;
+    size_t size; // in bits
+    size_t capacity; // in bytes
     unsigned char *buffer;
     FILE *fp;
 } typedef bit_stream;
