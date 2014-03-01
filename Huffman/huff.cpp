@@ -43,7 +43,7 @@ void load_file(char *file){
         freq[data[i]]++;
     }
     for(int i = 0; i < size; i++){
-        printf("%c ", data[i]);
+        printf("%X ", data[i]);
     }
     putchar('\n');
     /*
@@ -219,7 +219,7 @@ void print_code(code c){
 }
 
 void compress(char *compressed){
-    printf("size: %d\n", queue.size());
+    //printf("size: %d\n", queue.size());
     for(int i = 0; i < 256; i++){
         if(!freq[i])
             continue;
@@ -256,7 +256,7 @@ void compress(char *compressed){
     for(int i = 0; i < 257; i++){
         code c = codes[i];
         if(c.length){
-            printf("char: %c ", i);
+            printf("char: %X ", i);
             print_code(c);
         }
     }
