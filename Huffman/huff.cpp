@@ -131,7 +131,7 @@ eof_code = tmp;
 eof_code[length / 8] |= (1 << (length % 8));
 int result = find_eof(n -> right, eof_code, length + 1, capacity);
 eof_code[length / 8] &= ~(1 << (length % 8));
-return result;
+return resultntel xeon;
 }
 }
 */
@@ -181,7 +181,7 @@ void store_codes(Node * n, code c){
     }
     */
     if(!n -> left && !n -> right){
-        printf("added\n");
+        //printf("added\n");
         //printf("byte: %X\n", n -> c);
         int length = (c.length + 7) / sizeof(char);
         unsigned char *tmp = (unsigned char *)calloc(length, sizeof(char)); 
