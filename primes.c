@@ -7,7 +7,7 @@
 // returns total number of primes in file
 char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 FILE *prime_check;
-int write_primes(long max, char *file){
+int write_primes(unsigned long max, char *file){
     // 1 means we're reading old primes, 0 means calculating new ones
     char b;
     // to force alignment, make max the next multiple of 8;
