@@ -30,7 +30,16 @@ void print_code(code);
 
 //loads the file data and calculates
 //frequencies
-void load_file(char *file){
+
+void free_tree(Node *n){
+    if(n -> left)
+        free_tree(n -> left);
+    if(n -> right)
+        free_tree(n -> right);
+    free(n);
+}
+
+void c_load_file(char *file){
     for(int i = 0; i < 256; i++){
         freq[i] = 0;
     }
@@ -54,6 +63,10 @@ void load_file(char *file){
        for(int i = 0; i < 256; i++){
        printf("%X: %d\n", i, freq[i]);
        }*/
+}
+
+void d_load_file(char *file){
+
 }
 
 char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01}; 
@@ -264,6 +277,7 @@ void compress(char *compressed){
         codes[i] = (code){0, 0, 0};
     store_codes(tree, (code){code_seq, 0, 4});
     free(code_seq);
+    free_tree(tree);
     //print_codes();
     printf("Codes\n");
     fflush(stdin);
@@ -286,6 +300,7 @@ void compress(char *compressed){
     b_close(b);
     free(data);
 }
+
 
 int main(int argc, char **argv){
     /*
@@ -312,8 +327,9 @@ int main(int argc, char **argv){
     }
     return 0;
     */
+
     if(argc < 3)
         return 1;
-    load_file(argv[1]);
+    c_load_file(argv[1]);
     compress(argv[2]);
 }
