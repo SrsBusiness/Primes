@@ -5,10 +5,21 @@
 #include <map>
 #include <string.h>
 #include <assert.h>
+#include <unordered_map>
+#include <string>
 using namespace std;
 
+/*
+32 byte bit-field representing alphabet
+1 means character is present, 0 otherwise
+If preset, expect it's code length in a byte
+Max dict size: 32 + 256 + 1 bytes
+
+Followed by concatenation of huffman codes
+
+*/
 #define NAC 257 // not a character
-//#define EOFC 256 // eof character
+#define EOFC 256 // eof character
 unsigned char *data;
 size_t size;
 int freq[256];
@@ -66,7 +77,14 @@ void c_load_file(char *file){
 }
 
 void d_load_file(char *file){
-
+    fp = fopen(file, "r");
+    fseek(fp, 0L, SEEK_END);
+    size = ftell(fp);
+    printf("size: %u\n", size);
+    fseek(fp, 0L, SEEK_SET);
+    data = (unsigned char *)calloc(size, sizeof(char));
+    fread(data, sizeof(char), size, fp);
+    fclose(fp);
 }
 
 char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01}; 
@@ -85,7 +103,12 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
         shift[i + 1] |= (buffer[i] & ((1 << offset) - 1)) << (8 - offset);
         shift[i] = buffer[i] >> offset;
     }
+    /*
+        can only flush full bytes to file
+        
+    */ 
     for(int i = 0; i < size; i++){
+        // flush buffer if 
         if(b_stream -> size + 8 >= b_stream -> capacity * 8){
             // flush buffer
             fwrite(b_stream -> buffer, sizeof(char), b_stream -> capacity, b_stream -> fp);
@@ -97,7 +120,6 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
         }
         //printf("size: %d, i: %d\n", b_stream -> size / 8, i);  
         b_stream -> buffer[b_stream -> size / 8] |= shift[i];
-        
         b_stream -> size += 8;
     }
     b_stream -> size = old_size + bits % (1 << 16);
@@ -239,13 +261,47 @@ void store_codes(Node * n, code c){
    */
 
 void print_code(code c){
-    for(int j = 0; j < c.length; j++)
+    for(int j = 0; j < c.length; j++){
         putchar('0' + ((c.code_seq[j / 8] >> (7 - (j % 8))) & 1));
+    }
     putchar('\n');
 }
 
-void compress(char *compressed){
+void get_lengths(Node *n, int level, unsigned char lengths[257]){
+    if(n -> left) 
+        get_lengths(n -> left, level + 1, lengths);
+    if(n -> right)
+        get_lengths(n -> right, level + 1, lengths);
+    else if(!n -> left && !n -> right){
+        lengths[n -> c] = level; 
+    }
+}
+
+void inc_code(code *c){
+    int length = c -> length;
+    unsigned char *tmp = c -> code_seq;
+    int last = (length - 1) / 8;
+    //printf("%d\n", last);
+    int overflow = (tmp[last] ==(unsigned char) ~((1 << (7 - (length + 7) % 8)) - 1));
+    /*
+    if(overflow)
+        printf("overflow: %d\n", overflow);
+    */
+    //printf("1 << ~((7 - (length - 1) % 8) - 1)): %d\n", (unsigned char)~((1 << (7 - (length - 1) % 8)) - 1));
+    //printf("tmp[last]: %d\n", tmp[last]);
+    //printf("(int)0x80 >> ((c -> length - 1) % 8): %d\n", (char)0x80 >> ((c -> length - 1) % 8));
+    tmp[last] += 1 << (7 - (length - 1) % 8);
+    //printf("overflow: %d\n", overflow);
+    while(overflow && --last >= 0){
+        overflow = (tmp[last] == 0xFF);
+        tmp[last] += 1; 
+    }
+    //printf("%d\n", 1 << (7 - (c -> length - 1) % 8));
+}
+
+void compress(char *input, char *compressed){
     //printf("size: %d\n", queue.size());
+    c_load_file(input);
     for(int i = 0; i < 256; i++){
         if(!freq[i])
             continue;
@@ -255,11 +311,9 @@ void compress(char *compressed){
         queue.push(n);
     }
     // push eof
-    /*
     Node *eof = (Node *)malloc(sizeof(Node));
-    *eof = (Node){EOFC, 0, 0, NULL, NULL};
+    *eof = (Node){EOFC, 1, 0, NULL, NULL};
     queue.push(eof);
-    */
     while(queue.size() > 1){
         Node *n1 = queue.pop();
         Node *n2 = queue.pop();
@@ -268,19 +322,42 @@ void compress(char *compressed){
         queue.push(n3);
     }
     tree = queue.pop();
-    printf("Queue Tree:\n");
-    print_tree(tree, 0);
-    //unsigned char *eof_code = (unsigned char *)calloc(4, sizeof(char));
-    //find_eof(tree, eof_code, 0, 4);
-    unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
+    //printf("Queue Tree:\n");
+    //print_tree(tree, 0);
+    /*
+        traverse tree and note the lenghts for each character
+     */
+    unsigned char lengths[257] = {0};
+    get_lengths(tree, 0, lengths);
+    // should free tree here;
+    free_tree(tree);
+    P_Queue sort_by_length;
+    for(int i = 0; i < 257; i++){
+        if(lengths[i]){ 
+            Node *n = (Node *)malloc(sizeof(Node));
+            *n = (Node){i, lengths[i], 0, NULL, NULL};
+            sort_by_length.push(n);
+        }
+    }
+    sort_by_length.print();
+        printf("\n\n\n");
+    code c = (code){(unsigned char *)calloc(4, sizeof(char)), 1, 4}; 
     for(int i = 0; i < 257; i++)
         codes[i] = (code){0, 0, 0};
-    store_codes(tree, (code){code_seq, 0, 4});
-    free(code_seq);
-    free_tree(tree);
-    //print_codes();
-    printf("Codes\n");
-    fflush(stdin);
+    while(sort_by_length.size() > 0){
+        Node *n = sort_by_length.pop();
+        sort_by_length.print();
+        printf("\n\n\n");
+        c.length = n -> priority; 
+        unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
+        memcpy(code_seq, c.code_seq, 4);
+        codes[n -> c] = (code){code_seq, c.length, c.capacity};
+        //printf("%d %c ",n -> n, n -> c);
+        //print_code(codes[n -> c]);
+        inc_code(&c);
+        free(n);
+    }
+    free(c.code_seq);
     for(int i = 0; i < 257; i++){
         code c = codes[i];
         if(c.length){
@@ -289,6 +366,18 @@ void compress(char *compressed){
         }
     }
     bit_stream *b = b_open(compressed);
+    unsigned char bitfield[32] = {0};
+    unsigned char code_lengths[257];
+    int alpha_size = 0;
+    for(int i = 0; i < 256; i++)
+        if(freq[i] > 0){
+            bitfield[i / 8] |= 1 << (7 - i % 8);
+            code_lengths[alpha_size++] = codes[i].length;
+        }
+    code_lengths[alpha_size++] = codes[EOFC].length;
+    b_write(b, bitfield, 256);
+    b_write(b, code_lengths, alpha_size * 8);
+    printf("size: %u\n", size);
     for(int i = 0; i < size; i++){
         code c = codes[data[i]];
         if(!c.length)
@@ -296,11 +385,125 @@ void compress(char *compressed){
         //printf("length: %d, character: %X\n", c.length, data[i]);
         b_write(b, c.code_seq, c.length);
     }
-    //b_write(b, codes[EOFC].code_seq, codes[EOFC].length);
+    b_write(b, codes[EOFC].code_seq, codes[EOFC].length);
     b_close(b);
+    for(int i = 0; i < 257; i++)
+        if(codes[i].code_seq)
+            free(codes[i].code_seq);
     free(data);
 }
 
+// next_bit = index of next bit
+void next_bit(size_t next_bit, code *c){
+    //printf("data[%d / 8]: %X\n", next_bit, data[next_bit / 8]);
+    c -> code_seq[c -> length / 8] |= ((data[next_bit / 8] >> (7 - next_bit % 8)) & 1) << (7 - c -> length % 8);
+    c -> length++;
+}
+
+file_buffer *fb_open(char *out){
+    file_buffer *result = (file_buffer *)malloc(sizeof(file_buffer));
+    *result = (file_buffer){0, 1 << 16, (unsigned char *)calloc(1 << 16, sizeof(char)), fopen(out, "w+") };
+    return result;
+}
+
+void fb_write(file_buffer *fb, unsigned char c){
+    if(fb -> size == fb -> capacity){
+        fwrite(fb -> buffer, sizeof(char), fb -> capacity, fb -> fp);
+        fb -> size = 0;
+    }
+    fb -> buffer[fb -> size++] = c;
+}
+
+void fb_close(file_buffer *fb){
+    printf("file size: %d\n", fb -> size);
+    if(fb -> size)
+        fwrite(fb -> buffer, sizeof(char), fb -> size, fb -> fp);
+    fclose(fb -> fp);
+    free(fb -> buffer);
+    free(fb);
+}
+void decompress(char *in, char *out){
+    d_load_file(in);
+    int alpha_size = 0;
+    unordered_map<code, unsigned int, code_hasher> codes_found;
+    unsigned char lengths[257] = {0};
+    for(int i = 0; i < 256; i++){
+        if((data[i / 8] >> (7 - (i % 8))) & 1){
+            lengths[i] = 1;
+            alpha_size++;
+        }
+    }
+    printf("Alphabet size: %d\n", alpha_size);
+    lengths[256] = 1;
+    // lengths[i] == 1 if i is in the alphabet
+    int index = 0;
+    for(int i = 0; i < alpha_size + 1; i++){
+        while(!lengths[index])
+            index++;
+        lengths[index++] = data[i + 32];
+    }
+    /*
+    for(int i = 0; i < 257; i++){
+        if(lengths[i])
+            printf("Character: %c, length: %u\n", i, lengths[i]);
+    }
+    */
+    P_Queue q;
+    //code c = (code){(unsigned char *)calloc(4, sizeof(char)), 0, 4};
+    for(int i = 0; i < 257; i++){
+        if(lengths[i]){
+            Node *n = (Node *)malloc(sizeof(Node));
+            *n = (Node){i, lengths[i], 0, NULL, NULL};
+            q.push(n);
+        }
+    }
+    //for(int i = 0; i < 257; i++)
+    //    codes[i] = (code){0, 0, 0};
+    code c = (code){(unsigned char *)calloc(4, sizeof(char)), 0, 4};
+    while(q.size() > 0){
+        Node *n = q.pop();
+        //q.print();
+        printf("\n\n\n");
+        c.length = n -> priority; 
+        unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
+        memcpy(code_seq, c.code_seq, 4);
+        code tmp = (code){code_seq, c.length, c.capacity};
+        codes_found[tmp] = n -> c;
+        //printf("%d %c ",n -> n, n -> c);
+        //print_code(codes[n -> c]);
+        inc_code(&c);
+        printf("char: %c\n ", n -> c);
+        free(n);
+    }
+    size_t seek = 256 + (alpha_size + 1) * 8;
+    file_buffer *fb = fb_open(out);
+    for(int i = 0; i < 4; i++)
+        c.code_seq[i] = 0;
+    c.length = 0;
+    while(1){
+        next_bit(seek++, &c);
+        //print_code(c);
+        if(codes_found.find(c) != codes_found.end()){
+            print_code(c);
+            unsigned int character = codes_found[c];
+            if(character == EOFC)
+                break;
+            fb_write(fb, codes_found[c]);
+            c.length = 0;
+            for(int i = 0; i < 4; i++)
+                c.code_seq[i] = 0;
+        }
+    }
+    fb_close(fb); 
+    /*
+    for(int i = 0; i < 32; i++){
+        next_bit(i + 256 + (alpha_size + 1) * 8, &c); 
+        //print_code(c);
+    }
+    print_code(c);
+    */
+    // all the lengths have been read
+}
 
 int main(int argc, char **argv){
     /*
@@ -327,9 +530,15 @@ int main(int argc, char **argv){
     }
     return 0;
     */
-
     if(argc < 3)
         return 1;
-    c_load_file(argv[1]);
-    compress(argv[2]);
+    //compress(argv[1], argv[2]);
+    decompress(argv[1], argv[2]);
+    /*
+    code c = (code){(unsigned char *)calloc(4, sizeof(char)), 5, 4};
+    for(int i = 0; i < 32; i++){
+        print_code(c);
+        inc_code(&c); 
+    } 
+    */
 }
