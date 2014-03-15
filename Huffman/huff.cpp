@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <unordered_map>
 #include <string>
+#include <printf.h>
 using namespace std;
 
 /*
@@ -28,6 +29,7 @@ Node *tree;
 P_Queue queue;
 code codes[257];
 unsigned char *eof;
+int flushed = 0;
 /*
    void print(vector<Node *> *v){
    for(int i = 0; i < (*v).size(); i++){
@@ -41,6 +43,25 @@ void print_code(code);
 
 //loads the file data and calculates
 //frequencies
+
+int printf_arginfo_b(const struct printf_info *info, size_t n, int *argtypes){
+    if(n > 0)
+        *argtypes = PA_INT | PA_FLAG_LONG;
+    return 1;
+}
+
+int printf_output_b(FILE *stream, const struct printf_info *info, const void *const *args){
+    long output = **(long **)(args);
+    int prec = info -> prec;
+    if(prec == -1)
+        prec = 64;
+    char buffer[64];
+    buffer[prec] = 0;
+    for(int i = prec - 1; i >= 0; i--){
+        buffer[i] = ((output >> (prec - 1 - i)) & 1) + '0';
+    }
+    return fprintf(stream, "%s", buffer);
+}
 
 void free_tree(Node *n){
     if(n -> left)
@@ -94,11 +115,12 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
     // need to shift buffer by the offset
     //printf("bits: %d\n", bits);
     //printf("bits: %d, b_stream -> size: %d\n", bits, b_stream -> size);
+    char offset = b_stream -> size % 8;
     int size = (bits + 15) / 8;
+    //printf("extended size: %d\n", size);
     //printf("size: %d\n", size);
     unsigned char *shift = (unsigned char *)calloc(size, sizeof(char));  
-    char offset = b_stream -> size % 8;
-    int old_size = b_stream -> size;
+    //int old_size = b_stream -> size;
     for(int i = size - 2; i >= 0; i--){
         shift[i + 1] |= (buffer[i] & ((1 << offset) - 1)) << (8 - offset);
         shift[i] = buffer[i] >> offset;
@@ -107,22 +129,46 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
         can only flush full bytes to file
         
     */ 
-    for(int i = 0; i < size; i++){
+    //printf("bits: %lu, size: %lu\n", bits, b_stream -> size);
+    int new_size = b_stream -> size + bits;
+    int i = 0;
+    while(b_stream -> size != new_size){
         // flush buffer if 
-        if(b_stream -> size + 8 >= b_stream -> capacity * 8){
+        if(b_stream -> size / 8 == b_stream -> capacity){
             // flush buffer
+            //int check = b_stream -> size / 8;
+            //int check1 = b_stream -> capacity;
+            printf("flushed\n"); 
+            flushed++;
             fwrite(b_stream -> buffer, sizeof(char), b_stream -> capacity, b_stream -> fp);
-            old_size = b_stream -> size = 0;
+            //old_size = b_stream -> size = 0;
             for(int j = 0; j < b_stream -> capacity; j++){
                 b_stream -> buffer[j] = 0;
             }
+            new_size -= b_stream -> size;
             b_stream -> size = 0;
         }
         //printf("size: %d, i: %d\n", b_stream -> size / 8, i);  
-        b_stream -> buffer[b_stream -> size / 8] |= shift[i];
-        b_stream -> size += 8;
+        b_stream -> buffer[b_stream -> size / 8] |= shift[i++];
+        //printf("b_stream -> size / 8: %d, i: %d, written: %.8b\n", b_stream -> size / 8, i - 1, shift[i - 1]);
+        /*
+        if(i == (bits + offset + 7) / 8 - 1){
+            b_stream -> size += (bits + 7) % 8 + 1;
+            printf("last size increment: %d\n", ((bits + offset + 7) % 8) + 1);
+        }
+        */
+        if(8 - b_stream -> size % 8 > new_size - b_stream -> size){
+            b_stream -> size = new_size;
+        }
+        else
+            b_stream -> size = (b_stream -> size + 8) & 0xFFFFFFFFFFFFFFF8;
+        //printf("b_stream -> size: %lu\n", b_stream -> size);
+        //b_stream -> size += 8;
+        //printf("size: %d\n", b_stream -> size);
     }
-    b_stream -> size = old_size + bits % (1 << 16);
+    //printf("size after: %Lu\n\n\n", b_stream -> size);
+    //printf("bits: %lu\n", bits);
+    //b_stream -> size = old_size + bits % (1 << 16);
     free(shift);
     //printf("b_stream -> size after: %d\n", b_stream -> size);
     //assert(b_stream -> size % 8 == bits % 8);
@@ -139,8 +185,8 @@ void b_close(bit_stream *b_stream){
 bit_stream *b_open(char *output){
     FILE *out = fopen(output, "w+");
     bit_stream *result = (bit_stream *)malloc(sizeof(bit_stream));
-    unsigned char *buffer = (unsigned char *)calloc(1 << 16, sizeof(char));
-    *result = (bit_stream){0, 1 << 16, buffer, out};
+    unsigned char *buffer = (unsigned char *)calloc(1L << 16, sizeof(char));
+    *result = (bit_stream){0, 1L << 16, buffer, out};
     return result;
 }
 
@@ -339,14 +385,14 @@ void compress(char *input, char *compressed){
             sort_by_length.push(n);
         }
     }
-    sort_by_length.print();
-        printf("\n\n\n");
+    //sort_by_length.print();
+        //printf("\n\n\n");
     code c = (code){(unsigned char *)calloc(4, sizeof(char)), 1, 4}; 
     for(int i = 0; i < 257; i++)
         codes[i] = (code){0, 0, 0};
     while(sort_by_length.size() > 0){
         Node *n = sort_by_length.pop();
-        sort_by_length.print();
+        //sort_by_length.print();
         printf("\n\n\n");
         c.length = n -> priority; 
         unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
@@ -383,6 +429,7 @@ void compress(char *input, char *compressed){
         if(!c.length)
             continue;
         //printf("length: %d, character: %X\n", c.length, data[i]);
+        //print_code(c);
         b_write(b, c.code_seq, c.length);
     }
     b_write(b, codes[EOFC].code_seq, codes[EOFC].length);
@@ -391,6 +438,7 @@ void compress(char *input, char *compressed){
         if(codes[i].code_seq)
             free(codes[i].code_seq);
     free(data);
+    printf("Flushed %d times\n", flushed);
 }
 
 // next_bit = index of next bit
@@ -463,7 +511,7 @@ void decompress(char *in, char *out){
     while(q.size() > 0){
         Node *n = q.pop();
         //q.print();
-        printf("\n\n\n");
+        //printf("\n\n\n");
         c.length = n -> priority; 
         unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
         memcpy(code_seq, c.code_seq, 4);
@@ -472,7 +520,7 @@ void decompress(char *in, char *out){
         //printf("%d %c ",n -> n, n -> c);
         //print_code(codes[n -> c]);
         inc_code(&c);
-        printf("char: %c\n ", n -> c);
+        //printf("char: %c\n ", n -> c);
         free(n);
     }
     size_t seek = 256 + (alpha_size + 1) * 8;
@@ -484,7 +532,7 @@ void decompress(char *in, char *out){
         next_bit(seek++, &c);
         //print_code(c);
         if(codes_found.find(c) != codes_found.end()){
-            print_code(c);
+            //print_code(c);
             unsigned int character = codes_found[c];
             if(character == EOFC)
                 break;
@@ -494,6 +542,7 @@ void decompress(char *in, char *out){
                 c.code_seq[i] = 0;
         }
     }
+    printf("seek: %d\n", seek);
     fb_close(fb); 
     /*
     for(int i = 0; i < 32; i++){
@@ -530,6 +579,8 @@ int main(int argc, char **argv){
     }
     return 0;
     */
+    register_printf_function ('b',printf_output_b, printf_arginfo_b);
+    //printf("%.16b\n", 0xFFF0);
     if(argc < 3)
         return 1;
     //compress(argv[1], argv[2]);
