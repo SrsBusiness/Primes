@@ -4,10 +4,10 @@
 #include <vector>
 #include <map>
 #include <string.h>
-#include <assert.h>
 #include <unordered_map>
 #include <string>
 #include <printf.h>
+#include <unistd.h>
 using namespace std;
 
 /*
@@ -82,7 +82,7 @@ void c_load_file(char *file){
     data = (unsigned char *)calloc(size, sizeof(char));
     fread(data, sizeof(char), size, fp);
     fclose(fp);
-    for(int i = 0; i < size; i++){
+    for(size_t i = 0; i < size; i++){
         freq[data[i]]++;
     }
     /*
@@ -101,14 +101,14 @@ void d_load_file(char *file){
     fp = fopen(file, "r");
     fseek(fp, 0L, SEEK_END);
     size = ftell(fp);
-    printf("size: %u\n", size);
+    //printf("size: %u\n", size);
     fseek(fp, 0L, SEEK_SET);
     data = (unsigned char *)calloc(size, sizeof(char));
     fread(data, sizeof(char), size, fp);
     fclose(fp);
 }
 
-char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01}; 
+//char masks[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01}; 
 void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
     // at the beginning of this function call, the buffer should never be full
     // since it should have been flushed at the end of the last call to this function
@@ -130,7 +130,7 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
         
     */ 
     //printf("bits: %lu, size: %lu\n", bits, b_stream -> size);
-    int new_size = b_stream -> size + bits;
+    size_t new_size = b_stream -> size + bits;
     int i = 0;
     while(b_stream -> size != new_size){
         // flush buffer if 
@@ -138,7 +138,7 @@ void b_write(bit_stream *b_stream, unsigned char *buffer, size_t bits){
             // flush buffer
             //int check = b_stream -> size / 8;
             //int check1 = b_stream -> capacity;
-            printf("flushed\n"); 
+            //printf("flushed\n"); 
             flushed++;
             fwrite(b_stream -> buffer, sizeof(char), b_stream -> capacity, b_stream -> fp);
             //old_size = b_stream -> size = 0;
@@ -351,7 +351,7 @@ void compress(char *input, char *compressed){
     for(int i = 0; i < 256; i++){
         if(!freq[i])
             continue;
-        printf("i = %c, freq = %d\n", i, freq[i]);
+        //printf("i = %c, freq = %d\n", i, freq[i]);
         Node *n = (Node *)malloc(sizeof(Node));
         *n = (Node){i, freq[i], 0, NULL, NULL};
         queue.push(n);
@@ -393,7 +393,7 @@ void compress(char *input, char *compressed){
     while(sort_by_length.size() > 0){
         Node *n = sort_by_length.pop();
         //sort_by_length.print();
-        printf("\n\n\n");
+        //printf("\n\n\n");
         c.length = n -> priority; 
         unsigned char *code_seq = (unsigned char *)calloc(4, sizeof(char));
         memcpy(code_seq, c.code_seq, 4);
@@ -404,6 +404,7 @@ void compress(char *input, char *compressed){
         free(n);
     }
     free(c.code_seq);
+    /*
     for(int i = 0; i < 257; i++){
         code c = codes[i];
         if(c.length){
@@ -411,6 +412,7 @@ void compress(char *input, char *compressed){
             print_code(c);
         }
     }
+    */
     bit_stream *b = b_open(compressed);
     unsigned char bitfield[32] = {0};
     unsigned char code_lengths[257];
@@ -423,7 +425,7 @@ void compress(char *input, char *compressed){
     code_lengths[alpha_size++] = codes[EOFC].length;
     b_write(b, bitfield, 256);
     b_write(b, code_lengths, alpha_size * 8);
-    printf("size: %u\n", size);
+    //printf("size: %u\n", size);
     for(int i = 0; i < size; i++){
         code c = codes[data[i]];
         if(!c.length)
@@ -438,7 +440,7 @@ void compress(char *input, char *compressed){
         if(codes[i].code_seq)
             free(codes[i].code_seq);
     free(data);
-    printf("Flushed %d times\n", flushed);
+    //printf("Flushed %d times\n", flushed);
 }
 
 // next_bit = index of next bit
@@ -463,7 +465,7 @@ void fb_write(file_buffer *fb, unsigned char c){
 }
 
 void fb_close(file_buffer *fb){
-    printf("file size: %d\n", fb -> size);
+    //printf("file size: %d\n", fb -> size);
     if(fb -> size)
         fwrite(fb -> buffer, sizeof(char), fb -> size, fb -> fp);
     fclose(fb -> fp);
@@ -475,13 +477,14 @@ void decompress(char *in, char *out){
     int alpha_size = 0;
     unordered_map<code, unsigned int, code_hasher> codes_found;
     unsigned char lengths[257] = {0};
+      
     for(int i = 0; i < 256; i++){
         if((data[i / 8] >> (7 - (i % 8))) & 1){
             lengths[i] = 1;
             alpha_size++;
         }
     }
-    printf("Alphabet size: %d\n", alpha_size);
+    //printf("Alphabet size: %d\n", alpha_size);
     lengths[256] = 1;
     // lengths[i] == 1 if i is in the alphabet
     int index = 0;
@@ -498,7 +501,7 @@ void decompress(char *in, char *out){
     */
     P_Queue q;
     //code c = (code){(unsigned char *)calloc(4, sizeof(char)), 0, 4};
-    for(int i = 0; i < 257; i++){
+    for(unsigned int i = 0; i < 257; i++){
         if(lengths[i]){
             Node *n = (Node *)malloc(sizeof(Node));
             *n = (Node){i, lengths[i], 0, NULL, NULL};
@@ -542,7 +545,7 @@ void decompress(char *in, char *out){
                 c.code_seq[i] = 0;
         }
     }
-    printf("seek: %d\n", seek);
+    //printf("seek: %d\n", seek);
     fb_close(fb); 
     /*
     for(int i = 0; i < 32; i++){
@@ -555,41 +558,34 @@ void decompress(char *in, char *out){
 }
 
 int main(int argc, char **argv){
+    int what_do = 'z';
     /*
-       Node *n;
-    // refactor this, it's ugly
-    P_Queue v = P_Queue();
-    for(int i = 10; i > 0; i--){
-    n = (Node *)malloc(sizeof(Node));
-     *n = (Node){i, (i + 1) / 2, 0, NULL, NULL};
-     v.push(n);
-     }
-    //printf("Size of queue: %d\n", v.size());
-    size_t size = v.size();
-    for(int i = 0; i < size; i++){
-    Node *tmp = v[i];
-    printf("char: %d, priority: %d\n", tmp -> c, tmp -> priority);
+    if(argc < 4)
+        return A;
+        */
+    what_do = getopt(argc, argv, "zx");
+    if(what_do == '?'){
+        printf("I an herped %c\n", what_do);
+        if(isprint(optopt))
+            printf("Unknown option %c\n", optopt);
+        else
+            printf("Unknown option %X\n", optopt);
+        exit(1);
     }
-    printf("Popping now\n");
-    for(int i = 0; i < size; i++){
-    //printf("Size before: %d\n", v.size());
-    Node *tmp = v.pop();
-    //printf("Size after: %d\n", v.size());
-    printf("char: %d, priority: %d\n", tmp -> c, tmp -> priority);
+    //for(int index = optind; index < argc; index++)
+    if(optind + 1 >= argc)
+        exit(1);
+    char *in = argv[optind]; 
+    char *out = argv[optind + 1];
+    //printf("in: %s, out, %s\n", in, out);
+    switch(what_do){
+        case 'z':
+            compress(in, out); 
+            break;
+        case 'x':
+            decompress(in, out);
+            break;
     }
-    return 0;
-    */
-    register_printf_function ('b',printf_output_b, printf_arginfo_b);
-    //printf("%.16b\n", 0xFFF0);
-    if(argc < 3)
-        return 1;
     //compress(argv[1], argv[2]);
-    decompress(argv[1], argv[2]);
-    /*
-    code c = (code){(unsigned char *)calloc(4, sizeof(char)), 5, 4};
-    for(int i = 0; i < 32; i++){
-        print_code(c);
-        inc_code(&c); 
-    } 
-    */
+    //decompress(argv[1], argv[2]);
 }

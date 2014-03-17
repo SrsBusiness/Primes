@@ -61,13 +61,13 @@ class P_Queue{
             print(0, 0);    
         }
         void print(size_t current, int indent){
-            int left = current * 2 + 1;
-            int right = (current + 1) * 2;
+            size_t left = current * 2 + 1;
+            size_t right = (current + 1) * 2;
             if(right < v.size())
                 print(right, indent + 4);
             for(int i = 0; i < indent; i++)
                 putchar(' ');
-            printf("%u %d %lu\n", v[current] -> c, v[current] -> priority, v[current] -> n);
+            //printfI("%u %d %lu\n", v[current] -> c, v[current] -> priority, v[current] -> n);
             if(left < v.size())
                 print(left, indent + 4);
                             
