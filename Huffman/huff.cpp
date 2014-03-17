@@ -76,6 +76,10 @@ void c_load_file(char *file){
         freq[i] = 0;
     }
     fp = fopen(file, "r"); 
+    if(!fp){
+        printf("File %s does not exist\n", file);
+        exit(1);
+    }
     fseek(fp, 0L, SEEK_END);
     size = ftell(fp);
     fseek(fp, 0L, SEEK_SET);
@@ -99,6 +103,10 @@ void c_load_file(char *file){
 
 void d_load_file(char *file){
     fp = fopen(file, "r");
+    if(!fp){
+        printf("File %s does not exist\n", file);
+        exit(1);
+    } 
     fseek(fp, 0L, SEEK_END);
     size = ftell(fp);
     //printf("size: %u\n", size);
