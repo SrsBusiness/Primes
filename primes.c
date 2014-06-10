@@ -29,8 +29,7 @@ int write_primes(unsigned long max, char *file){
         printf("File already contains more than %d primes\n", max);
         return -1;
     }
-    unsigned char *new_primes = calloc((max - size) / 8, 
-            sizeof(char));
+    unsigned char *new_primes = calloc((max - size) / 8, sizeof(char));
     if(!size)
         new_primes[0] |= 0xC0;
     unsigned long *old_primes = calloc(4096, sizeof(long));
